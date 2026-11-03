@@ -30,16 +30,17 @@ returns boolean language sql stable as $$
   )
 $$;
 
+-- تُرجع مصفوفة JSON واحدة (وليس صفوفاً) لتجاوز حد 1000 صف في Supabase
+drop function if exists links_list(text);
 create or replace function links_list(p_emp text)
-returns setof folder_links language plpgsql security definer set search_path = public as $$
+returns json language plpgsql security definer set search_path = public as $$
 declare u app_users;
 begin
   u := _rp_user(p_emp);
-  return query select * from folder_links l
+  return coalesce((select json_agg(l order by l.created_at) from folder_links l
    where u.role = 'admin' or (
      (coalesce(jsonb_array_length(u.scope->'subjects'), 0) = 0 or (u.scope->'subjects') ? l.subject) and
-     (l.grade is null or coalesce(jsonb_array_length(u.scope->'grades'), 0) = 0 or (u.scope->'grades') @> to_jsonb(l.grade)))
-   order by l.created_at;
+     (l.grade is null or coalesce(jsonb_array_length(u.scope->'grades'), 0) = 0 or (u.scope->'grades') @> to_jsonb(l.grade)))), '[]'::json);
 end $$;
 
 create or replace function link_add(p_emp text, p jsonb)

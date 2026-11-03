@@ -43,7 +43,9 @@ async function ensureLinks(force) {
 function openLink(t, parts, label = 'فتح المجلد') {
   const sh = shareLink(t), u = sh ? safeUrl(sh.url) : odUrl(parts);
   if (!u) return '';
-  return `<a class="od" href="${RP.esc(u)}" target="_blank" rel="noopener" title="${sh ? 'رابط مشاركة أضافه ' + RP.esc(sh.added_by || '') : 'مسار المجلد في OneDrive'}">${label} ${EXT}</a>${sh ? '<span class="tag">رابط مشاركة</span>' : ''}`;
+  const up = !!sh && /تعديل/.test(sh.title || '');
+  if (up && label === 'فتح المجلد') label = 'فتح ورفع الملفات';
+  return `<a class="od" href="${RP.esc(u)}" target="_blank" rel="noopener" title="${sh ? (up ? 'رابط مشاركة OneDrive يتيح الاطلاع ورفع الملفات لمنسوبي الجهة' : 'رابط مشاركة أضافه ' + RP.esc(sh.added_by || '')) : 'مسار المجلد في OneDrive'}">${label} ${EXT}</a>${sh ? `<span class="tag">${up ? 'يتيح الرفع' : 'رابط مشاركة'}</span>` : ''}`;
 }
 function linkList(t, empty = '') {
   const l = fileLinks(t);
