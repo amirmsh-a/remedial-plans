@@ -201,6 +201,7 @@ async function doLogin(emp, silent) {
   $('#login').hidden = true; $('#app').hidden = false;
   $('#whoName').textContent = u.full_name + ' · ' + (ROLES[u.role] || u.role);
   $('[data-view=users]').hidden = !can('manage_users');
+  $('[data-view=reports]').hidden = !isAdmin();
   $('[data-view=dashboard]').hidden = !can('view_dashboard');
   $('#addBtn').hidden = !can('add_plans');
   $('#exportBtn').hidden = !can('export');
@@ -222,7 +223,7 @@ async function loadPlans() {
 
 /* ---------------- التنقل ---------------- */
 function showView(v) {
-  if (v === 'users' && !can('manage_users')) v = can('view_dashboard') ? 'dashboard' : 'plans';
+  if ((v === 'users' && !can('manage_users')) || (v === 'reports' && !isAdmin())) v = can('view_dashboard') ? 'dashboard' : 'plans';
   if (v === 'dashboard' && !can('view_dashboard')) v = 'plans';
   state.view = v;
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));

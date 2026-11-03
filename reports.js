@@ -200,6 +200,7 @@ function bind() {
   el('rPdf').onclick = printPdf;
 }
 window.renderReports = () => {
+  if (!RP.state.user || RP.state.user.role !== 'admin') { el('reportOut').innerHTML = ''; return; }
   bind();
   const t = el('rType');
   if (!t.dataset.init && RP.state.user && RP.state.user.role === 'teacher') { t.value = 'plan'; }
