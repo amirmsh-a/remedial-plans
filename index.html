@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الخطط العلاجية للاختبار التكويني 1448</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E%3Crect width=%2248%22 height=%2248%22 rx=%2212%22 fill=%22%230f5f4f%22/%3E%3Cpath d=%22M14 25l7 7 13-14%22 fill=%22none%22 stroke=%22white%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<script src="config.js"></script>
+</head>
+<body>
+
+<!-- تسجيل الدخول -->
+<div id="login" class="login-wrap">
+  <form id="loginForm" class="login-card" autocomplete="off">
+    <div class="login-mark">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38V12a4 4 0 0 1 4-4h18l10 10v20a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4z" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 26l5 5 11-11" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h1>الخطط العلاجية للاختبار التكويني</h1>
+    <p class="muted" id="loginSchool"></p>
+    <label for="empId">الرقم الوظيفي</label>
+    <input id="empId" inputmode="numeric" required placeholder="أدخل رقمك الوظيفي">
+    <button type="submit" class="btn primary block" id="loginBtn">دخول</button>
+    <p class="err" id="loginErr" role="alert"></p>
+    <p class="hint" id="demoHint" hidden>وضع تجريبي: استخدم الرقم <b>1000</b> للدخول كمدير.</p>
+  </form>
+</div>
+
+<!-- التطبيق -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <div>
+        <strong>الخطط العلاجية للاختبار التكويني</strong>
+        <small id="brandSub"></small>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="dashboard">لوحة الإحصاء</button>
+      <button class="tab" data-view="plans">الخطط العلاجية</button>
+      <button class="tab admin-only" data-view="users">المستخدمون</button>
+    </nav>
+    <div class="who">
+      <span id="whoName"></span>
+      <button class="btn ghost sm" id="logoutBtn">خروج</button>
+    </div>
+  </header>
+  <div id="demoBanner" class="banner" hidden>الموقع يعمل في الوضع التجريبي — البيانات محفوظة في هذا المتصفح فقط. اربطه بـ Supabase من ملف config.js.</div>
+
+  <main>
+    <!-- لوحة الإحصاء -->
+    <section id="view-dashboard" class="view">
+      <div class="view-head">
+        <h2>لوحة الإحصاء والتحليل</h2>
+        <div class="filters inline">
+          <select id="dSubject"><option value="">كل المواد</option></select>
+          <select id="dGrade"><option value="">كل الصفوف</option></select>
+        </div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="grid2">
+        <div class="card"><h3>نسبة إنجاز مكونات الخطة لكل فصل</h3><div class="chart-box" id="cCompletion"></div></div>
+        <div class="card"><h3>نسبة الطلاب المتعثرين لكل فصل</h3><div class="chart-box" id="cWeak"></div></div>
+        <div class="card"><h3>متوسط الأداء قبل الخطة وبعدها</h3><div class="chart-box" id="cImpact"></div></div>
+        <div class="card"><h3>اكتمال كل مكوّن على مستوى الفصول</h3><div class="chart-box" id="cComponents"></div></div>
+      </div>
+      <div class="card">
+        <h3>ملخص حسب المادة والصف</h3>
+        <div class="table-wrap"><table class="tbl" id="summaryTbl"></table></div>
+      </div>
+      <div class="card">
+        <h3>تحليل محتويات ملف كل فصل</h3>
+        <p class="muted sm">✔ مكتمل · — غير مكتمل</p>
+        <div class="table-wrap"><table class="tbl matrix" id="matrixTbl"></table></div>
+      </div>
+    </section>
+
+    <!-- الخطط -->
+    <section id="view-plans" class="view" hidden>
+      <div class="view-head">
+        <h2>الخطط العلاجية</h2>
+        <div class="actions">
+          <button class="btn ghost" id="exportBtn">تصدير CSV</button>
+          <button class="btn primary" id="addBtn">+ إضافة خطة</button>
+        </div>
+      </div>
+      <div class="filters card">
+        <input id="fSearch" type="search" placeholder="بحث: معلم، مهارة، ملاحظة…">
+        <select id="fSubject"><option value="">كل المواد</option></select>
+        <select id="fGrade"><option value="">كل الصفوف</option></select>
+        <select id="fSection"><option value="">كل الفصول</option></select>
+        <select id="fStatus"><option value="">كل الحالات</option></select>
+        <select id="fCompletion">
+          <option value="">كل مستويات الإنجاز</option>
+          <option value="0">لم يبدأ (0%)</option>
+          <option value="low">أقل من 50%</option>
+          <option value="mid">50% – 99%</option>
+          <option value="full">مكتمل 100%</option>
+        </select>
+        <button class="btn ghost sm" id="resetFilters">مسح</button>
+      </div>
+      <p class="muted sm" id="plansCount"></p>
+      <div class="table-wrap card flush"><table class="tbl" id="plansTbl"></table></div>
+    </section>
+
+    <!-- المستخدمون -->
+    <section id="view-users" class="view" hidden>
+      <div class="view-head"><h2>إدارة أرقام الدخول</h2></div>
+      <form id="userForm" class="card filters">
+        <input id="uEmp" required inputmode="numeric" placeholder="الرقم الوظيفي">
+        <input id="uName" required placeholder="الاسم">
+        <select id="uRole"><option value="teacher">معلم</option><option value="admin">مدير</option></select>
+        <button class="btn primary" type="submit">حفظ المستخدم</button>
+      </form>
+      <div class="table-wrap card flush"><table class="tbl" id="usersTbl"></table></div>
+    </section>
+  </main>
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<!-- نافذة الخطة -->
+<dialog id="planDialog">
+  <form id="planForm" method="dialog">
+    <div class="dlg-head"><h3 id="planTitle">خطة علاجية</h3><button type="button" class="x" data-close>×</button></div>
+    <div class="dlg-body">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>المادة<select name="subject" required></select></label>
+        <label>الصف<select name="grade" required></select></label>
+        <label>الفصل<input name="section" type="number" min="1" max="12" required></label>
+        <label>المعلم<input name="teacher" placeholder="اسم المعلم"></label>
+        <label>تاريخ الاختبار التكويني<input name="test_date" type="date"></label>
+        <label>الحالة<select name="status"></select></label>
+        <label>عدد الطلاب<input name="students_total" type="number" min="0"></label>
+        <label>عدد المتعثرين<input name="students_weak" type="number" min="0"></label>
+        <label>بداية الخطة<input name="start_date" type="date"></label>
+        <label>نهاية الخطة<input name="end_date" type="date"></label>
+        <label>متوسط الأداء قبل الخطة %<input name="pre_score" type="number" min="0" max="100" step="0.1"></label>
+        <label>متوسط الأداء بعد الخطة %<input name="post_score" type="number" min="0" max="100" step="0.1"></label>
+      </div>
+      <label class="full">المهارات/النواتج المتعثرة<textarea name="weak_skills" rows="2"></textarea></label>
+      <label class="full">الاستراتيجيات والإجراءات العلاجية<textarea name="strategies" rows="2"></textarea></label>
+      <fieldset>
+        <legend>مكونات ملف الفصل</legend>
+        <div class="checks" id="compChecks"></div>
+      </fieldset>
+      <label class="full">ملاحظات<textarea name="notes" rows="2"></textarea></label>
+      <p class="err" id="planErr"></p>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn ghost" data-close>إلغاء</button>
+      <button type="submit" class="btn primary" id="planSave">حفظ</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirmDialog" class="small">
+  <div class="dlg-body"><p id="confirmMsg"></p></div>
+  <div class="dlg-foot">
+    <button class="btn ghost" id="confirmNo">إلغاء</button>
+    <button class="btn danger" id="confirmYes">حذف</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
