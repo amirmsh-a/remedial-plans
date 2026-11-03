@@ -39,8 +39,12 @@ async function ensureLinks(force) {
   return linksLoading;
 }
 
+// روابط الدرايف لمستوى المادة والصف تظهر للمدير والمشرف فقط، وللبقية على مستوى الفصل ومجلداته
+const fullDrive = () => !!RP.state.user && ['admin', 'supervisor'].includes(RP.state.user.role);
+const driveVisible = t => fullDrive() || t.section != null;
 // رابط فتح المجلد: رابط المشاركة الذي أضافه المستخدمون إن وُجد، وإلا مسار OneDrive
 function openLink(t, parts, label = 'فتح المجلد') {
+  if (!driveVisible(t)) return '';
   const sh = shareLink(t), u = sh ? safeUrl(sh.url) : odUrl(parts);
   if (!u) return '';
   const up = !!sh && /تعديل/.test(sh.title || '');
@@ -62,11 +66,11 @@ function canAddAt(t) {
 }
 function linkTools(t) {
   if (!canAddAt(t)) return '';
-  return `<span class="ltools"><button type="button" class="btn ghost sm" data-addlink='${tAttr(t)}'>+ رابط</button><button type="button" class="btn ghost sm" data-sharelink='${tAttr(t)}'>${shareLink(t) ? 'تغيير رابط المشاركة' : 'رابط المشاركة'}</button></span>`;
+  return `<span class="ltools"><button type="button" class="btn ghost sm" data-addlink='${tAttr(t)}'>+ رابط</button>${driveVisible(t) ? `<button type="button" class="btn ghost sm" data-sharelink='${tAttr(t)}'>${shareLink(t) ? 'تغيير رابط المشاركة' : 'رابط المشاركة'}</button>` : ''}</span>`;
 }
 // لوحة روابط المستوى الحالي (المادة / الصف / الفصل)
 function levelPanel(t, title) {
-  const sh = shareLink(t), files = fileLinks(t);
+  const sh = driveVisible(t) ? shareLink(t) : null, files = fileLinks(t);
   if (!files.length && !sh && !canAddAt(t)) return '';
   return `<div class="card lpanel"><div class="frow"><h3 style="margin:0">${LNK} ${RP.esc(title)}</h3>${linkTools(t)}</div>
     ${sh ? `<p class="sm" style="margin:.5rem 0 0">رابط مشاركة المجلد: <a class="od" href="${RP.esc(safeUrl(sh.url))}" target="_blank" rel="noopener">${RP.esc(sh.title)} ${EXT}</a> <span class="by">${RP.esc(sh.added_by || '')}</span>${canDel(sh) ? `<button type="button" class="x-sm" data-dellink="${RP.esc(sh.id)}">×</button>` : ''}</p>` : ''}
@@ -116,7 +120,7 @@ function render() {
     const subs = RP.subjectsOf(RP.state.plans);
     html = `<div class="fgrid">${subs.map(s => { const l = plansWhere(p => p.subject === s);
       return card({ title: s, sub: `${RP.fmt(l.length)} فصل · ${RP.fmt(l.filter(p => RP.completion(p) === 100).length)} مكتملة`, c: avg(l), go: [s, null, null], parts: [s], t: T(s) }); }).join('')}</div>`;
-    if (CFG.ONEDRIVE_SHARE) html += `<p class="muted sm">المجلد الرئيسي: <a class="od" href="${RP.esc(CFG.ONEDRIVE_SHARE)}" target="_blank" rel="noopener">الخطط العلاجية للاختبار التكويني 1448 ${EXT}</a></p>`;
+    if (CFG.ONEDRIVE_SHARE && fullDrive()) html += `<p class="muted sm">المجلد الرئيسي: <a class="od" href="${RP.esc(CFG.ONEDRIVE_SHARE)}" target="_blank" rel="noopener">الخطط العلاجية للاختبار التكويني 1448 ${EXT}</a></p>`;
   } else if (!grade) {
     const grades = [...new Set(plansWhere(p => p.subject === subject).map(p => p.grade))].sort((a, b) => a - b);
     html = levelPanel(T(subject), 'روابط ' + subject) + `<div class="fgrid">${grades.map(g => { const l = plansWhere(p => p.subject === subject && p.grade === g);

@@ -113,7 +113,7 @@ const localApi = {
     if (i >= 0) all[i] = { ...all[i], ...u }; else all.push(u); store.set(DEMO_USERS_KEY, all); return true;
   },
   _links() { return store.get('rp_demo_links', []); },
-  async listLinks(e) { const u = this._check(e); return this._links().filter(l => u.role === 'admin' || (l.grade == null ? (!((u.scope || {}).subjects || []).length || u.scope.subjects.includes(l.subject)) : inScope(u, l.subject, l.grade, l.section))); },
+  async listLinks(e) { const u = this._check(e); return this._links().filter(l => (['admin', 'supervisor'].includes(u.role) || l.kind !== 'folder' || l.section != null)).filter(l => u.role === 'admin' || (l.grade == null ? (!((u.scope || {}).subjects || []).length || u.scope.subjects.includes(l.subject)) : inScope(u, l.subject, l.grade, l.section))); },
   async addLink(e, l) {
     const u = this._check(e, 'add_links'); const g = (u.scope || {}).grades || [];
     if (!inScope(u, l.subject, l.grade || (g.length ? -1 : 1), l.section)) throw new Error('forbidden');
