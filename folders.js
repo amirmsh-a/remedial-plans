@@ -53,12 +53,12 @@ function render() {
   const { subject, grade, section } = nav;
   let html = '';
   if (!subject) {
-    const subs = [...new Set([...RP.SUBJECTS, ...RP.state.plans.map(p => p.subject)])];
+    const subs = RP.subjectsOf(RP.state.plans);
     html = `<div class="fgrid">${subs.map(s => { const l = plansWhere(p => p.subject === s);
       return card({ title: s, sub: `${RP.fmt(l.length)} فصل · ${RP.fmt(l.filter(p => RP.completion(p) === 100).length)} مكتملة`, c: avg(l), go: [s, null, null], parts: [s] }); }).join('')}</div>`;
     if (CFG.ONEDRIVE_SHARE) html += `<p class="muted sm">المجلد الرئيسي: <a class="od" href="${RP.esc(CFG.ONEDRIVE_SHARE)}" target="_blank" rel="noopener">الخطط العلاجية للاختبار التكويني 1448 ${EXT}</a></p>`;
   } else if (!grade) {
-    const grades = [...new Set([...Object.keys(RP.STRUCTURE[subject] || {}).map(Number), ...plansWhere(p => p.subject === subject).map(p => p.grade)])].sort((a, b) => a - b);
+    const grades = [...new Set(plansWhere(p => p.subject === subject).map(p => p.grade))].sort((a, b) => a - b);
     html = `<div class="fgrid">${grades.map(g => { const l = plansWhere(p => p.subject === subject && p.grade === g);
       return card({ title: gradeFolder(g), sub: `${RP.fmt(l.length)} فصول · ${RP.fmt(l.reduce((s, p) => s + (RP.num(p.students_weak) || 0), 0))} متعثر`, c: avg(l), go: [subject, g, null], parts: [subject, gradeFolder(g)] }); }).join('')}</div>`;
   } else if (!section) {
@@ -75,7 +75,7 @@ function render() {
 function renderClass(subject, grade, section) {
   const p = RP.state.plans.find(x => x.subject === subject && x.grade === grade && x.section === section);
   const base = [subject, gradeFolder(grade), classFolder(grade, section)];
-  if (!p) return `<div class="card empty">لا توجد خطة لهذا الفصل بعد.<br><br><button class="btn primary" data-new="1">إنشاء خطة</button> ${odLink(base, 'فتح مجلد الفصل')}</div>`;
+  if (!p) return `<div class="card empty">لا توجد خطة لهذا الفصل بعد.<br><br>${RP.can('add_plans') ? '<button class="btn primary" data-new="1">إنشاء خطة</button> ' : ''}${odLink(base, 'فتح مجلد الفصل')}</div>`;
   const pre = RP.num(p.pre_score), post = RP.num(p.post_score), w = RP.num(p.students_weak), t = RP.num(p.students_total);
   const info = [
     ['المعلم', RP.esc(p.teacher) || '—'], ['الطلاب / المتعثرون', (t === null ? '—' : RP.fmt(t)) + ' / ' + (w === null ? '—' : RP.fmt(w))],
@@ -84,7 +84,7 @@ function renderClass(subject, grade, section) {
     ['تاريخ الاختبار', p.test_date || '—']
   ];
   const panel = `<div class="card"><div class="frow"><h3 style="margin:0">خطة ${RP.esc(subject)} – ${RP.esc(RP.classLabel(p))}</h3>
-      <div class="actions"><button class="btn primary sm" data-edit-plan="1">فتح الخطة وتعديلها</button>${odLink(base, 'مجلد الفصل')}</div></div>
+      <div class="actions"><button class="btn primary sm" data-edit-plan="1">${RP.can('edit_plans') ? 'فتح الخطة وتعديلها' : 'عرض الخطة'}</button>${odLink(base, 'مجلد الفصل')}</div></div>
     <div class="plan-panel">${info.map(([l, v]) => `<div><div class="lbl">${l}</div><div class="v">${v}</div></div>`).join('')}
       <div><div class="lbl">إنجاز المكونات</div>${bar(RP.completion(p))}</div></div>
     ${p.weak_skills ? `<p class="sm"><b>المهارات المتعثرة:</b> ${RP.esc(p.weak_skills)}</p>` : ''}
@@ -94,7 +94,7 @@ function renderClass(subject, grade, section) {
     return `<div class="fcard comp ${done ? 'done' : ''}">
       <div class="frow">${ICON}<div class="fmeta"><div class="ft">${RP.esc(folder || label)}</div>
         <div class="fs">${done ? '✔ مكتمل' : 'لم يكتمل بعد'}</div></div></div>
-      <div class="frow end"><button type="button" class="btn ${done ? 'ghost' : 'primary'} sm" data-toggle-comp="${k}">${done ? 'إلغاء الاكتمال' : 'تحديد كمكتمل'}</button>${odLink([...base, folder || label], 'فتح المجلد')}</div></div>`;
+      <div class="frow end">${RP.can('edit_plans') ? `<button type="button" class="btn ${done ? 'ghost' : 'primary'} sm" data-toggle-comp="${k}">${done ? 'إلغاء الاكتمال' : 'تحديد كمكتمل'}</button>` : ''}${odLink([...base, folder || label], 'فتح المجلد')}</div></div>`;
   }).join('');
   return panel + `<h3 class="sub-h">مجلدات الفصل (${RP.COMPONENTS.length})</h3><div class="fgrid">${comps}</div>`;
 }

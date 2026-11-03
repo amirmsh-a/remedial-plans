@@ -158,3 +158,19 @@ a.od:hover{background:var(--brand-soft)}
 .plan-panel .lbl{color:var(--muted);font-size:.8rem}
 .plan-panel .v{font-weight:800}
 .sub-h{margin:.25rem 0 0}
+
+/* Users & permissions */
+.uform label{display:flex;flex-direction:column;gap:.25rem;font-size:.85rem;font-weight:700;color:var(--muted)}
+.uform .checks label{flex-direction:row;align-items:center;gap:.5rem;color:var(--ink);font-weight:500;font-size:.9rem;cursor:pointer}
+.uform .checks input{width:18px;height:18px;accent-color:var(--brand)}
+.uform input:read-only{background:#f3f5f4}
+.checks.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.checks.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.checks.six{grid-template-columns:repeat(6,minmax(0,1fr))}
+.pill.role-admin{background:var(--brand);color:#fff}
+.pill.role-supervisor{background:var(--brand-soft);color:var(--brand)}
+.pill.role-teacher{background:#e8eef9;color:#2f5aa0}
+.pill.role-viewer{background:#eef0ef;color:#56625f}
+#usersSummary{margin:0}
+@media (max-width:900px){.checks.four,.checks.six{grid-template-columns:repeat(3,minmax(0,1fr))}.checks.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.checks.three,.checks.four,.checks.six{grid-template-columns:repeat(2,minmax(0,1fr))}}

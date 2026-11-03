@@ -60,7 +60,7 @@ const remoteApi = {
   savePlan: (e, p) => rpc('plan_save', { p_emp: e, p }),
   deletePlan: (e, id) => rpc('plan_delete', { p_emp: e, p_id: id }),
   listUsers: e => rpc('users_list', { p_emp: e }),
-  saveUser: (e, u) => rpc('user_save', { p_emp: e, p_id: u.emp_id, p_name: u.full_name, p_role: u.role, p_active: u.active }),
+  saveUser: (e, u) => rpc('user_save', { p_emp: e, p_id: u.emp_id, p_name: u.full_name, p_role: u.role, p_active: u.active, p_perms: u.perms || {}, p_scope: u.scope || {} }),
   deleteUser: (e, id) => rpc('user_delete', { p_emp: e, p_id: id })
 };
 
@@ -91,29 +91,54 @@ const DEMO_USERS_KEY = 'rp_demo_users', DEMO_PLANS_KEY = 'rp_demo_plans';
 const localApi = {
   _users() { let u = store.get(DEMO_USERS_KEY, null); if (!u) { u = [{ emp_id: '1000', full_name: 'مدير تجريبي', role: 'admin', active: true }]; store.set(DEMO_USERS_KEY, u); } return u; },
   _plans() { let p = store.get(DEMO_PLANS_KEY, null); if (!p) { p = demoSeed(); store.set(DEMO_PLANS_KEY, p); } return p; },
-  _check(e, admin) { const u = this._users().find(x => x.emp_id === String(e).trim() && x.active); if (!u) throw new Error('unauthorized'); if (admin && u.role !== 'admin') throw new Error('forbidden'); return u; },
-  async login(e) { const u = this._check(e); return { emp_id: u.emp_id, full_name: u.full_name, role: u.role }; },
-  async listPlans(e) { this._check(e); return this._plans(); },
+  _check(e, perm) { const u = this._users().find(x => x.emp_id === String(e).trim() && x.active); if (!u) throw new Error('unauthorized'); if (perm && !userCan(u, perm)) throw new Error('forbidden'); return u; },
+  async login(e) { const u = this._check(e); return { emp_id: u.emp_id, full_name: u.full_name, role: u.role, perms: u.perms || {}, scope: u.scope || {} }; },
+  async listPlans(e) { const u = this._check(e); return this._plans().filter(p => inScope(u, p.subject, p.grade)); },
   async savePlan(e, p) {
-    const u = this._check(e); const all = this._plans();
+    const u = this._check(e, p.id ? 'edit_plans' : 'add_plans'); if (!inScope(u, p.subject, p.grade)) throw new Error('forbidden'); const all = this._plans();
     const row = { ...p, updated_by: u.full_name, updated_at: new Date().toISOString() };
     const i = all.findIndex(x => x.id === p.id);
     if (i >= 0) all[i] = row; else { row.id = uid(); all.push(row); }
     store.set(DEMO_PLANS_KEY, all); return row;
   },
-  async deletePlan(e, id) { this._check(e, true); store.set(DEMO_PLANS_KEY, this._plans().filter(x => x.id !== id)); return true; },
-  async listUsers(e) { this._check(e, true); return this._users(); },
+  async deletePlan(e, id) { this._check(e, 'delete_plans'); store.set(DEMO_PLANS_KEY, this._plans().filter(x => x.id !== id)); return true; },
+  async listUsers(e) { this._check(e, 'manage_users'); return this._users(); },
   async saveUser(e, u) {
-    this._check(e, true); const all = this._users(); const i = all.findIndex(x => x.emp_id === u.emp_id);
+    const me = this._check(e, 'manage_users'); if (me.role !== 'admin' && (u.role === 'admin' || (u.perms || {}).manage_users)) throw new Error('forbidden');
+    if (u.emp_id === me.emp_id && (u.role !== me.role || !u.active)) throw new Error('لا يمكنك تغيير دورك أو إيقاف حسابك');
+    const all = this._users(); const i = all.findIndex(x => x.emp_id === u.emp_id);
     if (i >= 0) all[i] = { ...all[i], ...u }; else all.push(u); store.set(DEMO_USERS_KEY, all); return true;
   },
-  async deleteUser(e, id) { const me = this._check(e, true); if (me.emp_id === id) throw new Error('لا يمكنك حذف حسابك'); store.set(DEMO_USERS_KEY, this._users().filter(x => x.emp_id !== id)); return true; }
+  async deleteUser(e, id) { const me = this._check(e, 'manage_users'); if (me.emp_id === id) throw new Error('لا يمكنك حذف حسابك'); store.set(DEMO_USERS_KEY, this._users().filter(x => x.emp_id !== id)); return true; }
 };
 const api = DEMO ? localApi : remoteApi;
+
+/* ---------------- الأدوار والصلاحيات ---------------- */
+const ROLES = { admin: 'مدير', supervisor: 'مشرف', teacher: 'معلم', viewer: 'مشاهد' };
+const PERMS = [
+  ['view_dashboard', 'عرض لوحة الإحصاء'], ['add_plans', 'إضافة خطط'], ['edit_plans', 'تعديل الخطط وتعبئتها'],
+  ['delete_plans', 'حذف الخطط'], ['export', 'تصدير البيانات'], ['manage_users', 'إدارة المستخدمين']
+];
+const PRESETS = {
+  admin: Object.fromEntries(PERMS.map(([k]) => [k, true])),
+  supervisor: { view_dashboard: true, add_plans: true, edit_plans: true, delete_plans: true, export: true },
+  teacher: { view_dashboard: true, edit_plans: true },
+  viewer: { view_dashboard: true, export: true }
+};
+function userCan(u, p) { return u.role === 'admin' || !!(u.perms || {})[p]; }
+function inScope(u, subject, grade) {
+  if (u.role === 'admin') return true;
+  const s = (u.scope || {}).subjects || [], g = (u.scope || {}).grades || [];
+  return (!s.length || s.includes(subject)) && (!g.length || g.includes(+grade));
+}
 
 /* ---------------- الحالة ---------------- */
 const state = { user: null, emp: null, plans: [], users: [], view: 'dashboard', charts: {}, sort: { key: 'default', dir: 1 } };
 const isAdmin = () => state.user && state.user.role === 'admin';
+const can = p => !!state.user && userCan(state.user, p);
+const userScope = () => (state.user && state.user.role !== 'admin' && state.user.scope) || {};
+const allowedSubjects = () => (userScope().subjects || []).length ? userScope().subjects : SUBJECTS;
+const allowedGrades = () => ((userScope().grades || []).length ? userScope().grades : [1, 2, 3, 4, 5, 6]).map(Number).sort((a, b) => a - b);
 
 /* ---------------- أدوات الواجهة ---------------- */
 let toastT, rzT;
@@ -125,7 +150,7 @@ function toast(msg, bad) {
 function errMsg(e) {
   const m = e && e.message || String(e);
   if (m === 'unauthorized') return 'الرقم الوظيفي غير مسجل أو غير مفعّل';
-  if (m === 'forbidden') return 'هذه العملية متاحة للمدير فقط';
+  if (m === 'forbidden') return 'ليست لديك صلاحية لهذه العملية';
   if (/Failed to fetch/i.test(m)) return 'تعذّر الاتصال بالخادم، تحقق من الإنترنت';
   return m;
 }
@@ -143,7 +168,7 @@ function fillSelect(el, items, keepFirst = true) {
   items.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; el.appendChild(o); });
 }
 const gradeOptions = subject => {
-  const set = new Set(); (subject ? [subject] : SUBJECTS).forEach(s => Object.keys(STRUCTURE[s]).forEach(g => set.add(+g)));
+  const set = new Set();
   state.plans.filter(p => !subject || p.subject === subject).forEach(p => set.add(+p.grade));
   return [...set].sort((a, b) => a - b).map(g => [g, 'الصف ' + GRADE_LONG[g]]);
 };
@@ -154,8 +179,11 @@ async function doLogin(emp, silent) {
   state.user = u; state.emp = String(emp).trim();
   store.set(SESSION_KEY, state.emp);
   $('#login').hidden = true; $('#app').hidden = false;
-  $('#whoName').textContent = u.full_name + (u.role === 'admin' ? ' · مدير' : '');
-  $$('.admin-only').forEach(el => el.hidden = !isAdmin());
+  $('#whoName').textContent = u.full_name + ' · ' + (ROLES[u.role] || u.role);
+  $('[data-view=users]').hidden = !can('manage_users');
+  $('[data-view=dashboard]').hidden = !can('view_dashboard');
+  $('#addBtn').hidden = !can('add_plans');
+  $('#exportBtn').hidden = !can('export');
   await loadPlans();
   showView(location.hash.startsWith('#folders') ? 'folders' : state.view);
   if (!silent) toast('أهلاً ' + u.full_name);
@@ -173,7 +201,8 @@ async function loadPlans() {
 
 /* ---------------- التنقل ---------------- */
 function showView(v) {
-  if (v === 'users' && !isAdmin()) v = 'dashboard';
+  if (v === 'users' && !can('manage_users')) v = can('view_dashboard') ? 'dashboard' : 'plans';
+  if (v === 'dashboard' && !can('view_dashboard')) v = 'plans';
   state.view = v;
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   $$('.view').forEach(s => s.hidden = s.id !== 'view-' + v);
@@ -186,7 +215,7 @@ function showView(v) {
 
 /* ---------------- الفلاتر ---------------- */
 function refreshFilterOptions() {
-  const subs = [...new Set([...SUBJECTS, ...state.plans.map(p => p.subject)])].map(s => [s, s]);
+  const subs = subjectsOf(state.plans).map(s => [s, s]);
   ['#fSubject', '#dSubject'].forEach(id => { const el = $(id), v = el.value; fillSelect(el, subs); el.value = v; });
   syncGradeOptions('#fSubject', '#fGrade'); syncGradeOptions('#dSubject', '#dGrade');
   const sec = [...new Set(state.plans.map(p => p.section))].sort((a, b) => a - b).map(s => [s, 'فصل ' + s]);
@@ -217,6 +246,7 @@ function filteredPlans() {
     return true;
   });
 }
+const subjectsOf = list => [...new Set(list.map(p => p.subject))].sort((a, b) => (SUBJECTS.indexOf(a) + 1 || 99) - (SUBJECTS.indexOf(b) + 1 || 99));
 const defaultOrder = (a, b) => SUBJECTS.indexOf(a.subject) - SUBJECTS.indexOf(b.subject) || a.grade - b.grade || a.section - b.section;
 
 /* ---------------- جدول الخطط ---------------- */
@@ -246,7 +276,7 @@ function renderPlans() {
       <td class="num">${imp === null ? '—' : (imp >= 0 ? '+' : '') + fmt(imp, 1) + '%'}</td>
       <td><span class="pill s${Math.max(0, STATUSES.indexOf(p.status))}">${esc(p.status)}</span></td>
       <td class="muted sm">${p.updated_at ? new Date(p.updated_at).toLocaleDateString('ar-SA-u-ca-islamic-umalqura') : '—'}${p.updated_by ? '<br>' + esc(p.updated_by) : ''}</td>
-      <td><button class="icon-btn edit" data-edit="${esc(p.id)}">تعديل</button>${isAdmin() ? `<button class="icon-btn del" data-del="${esc(p.id)}">حذف</button>` : ''}</td>
+      <td><button class="icon-btn edit" data-edit="${esc(p.id)}">${can('edit_plans') ? 'تعديل' : 'عرض'}</button>${can('delete_plans') ? `<button class="icon-btn del" data-del="${esc(p.id)}">حذف</button>` : ''}</td>
     </tr>`;
   }).join('');
   $('#plansTbl').innerHTML = head + '<tbody>' + body + '</tbody>';
@@ -255,16 +285,20 @@ function renderPlans() {
 /* ---------------- نموذج الخطة ---------------- */
 function openPlan(p, preset) {
   const f = $('#planForm'); const isNew = !p; preset = preset || {};
-  p = p || blankPlan(preset.subject || $('#fSubject').value || SUBJECTS[0], +(preset.grade || $('#fGrade').value || 1), +(preset.section || $('#fSection').value || 1));
-  $('#planTitle').textContent = isNew ? 'إضافة خطة علاجية' : `تعديل خطة ${p.subject} – ${classLabel(p)}`;
-  fillSelect(f.subject, [...new Set([...SUBJECTS, p.subject])].map(s => [s, s]), false);
-  fillSelect(f.grade, [1, 2, 3, 4, 5, 6].map(g => [g, 'الصف ' + GRADE_LONG[g]]), false);
+  p = p || blankPlan(preset.subject || $('#fSubject').value || allowedSubjects()[0], +(preset.grade || $('#fGrade').value || allowedGrades()[0]), +(preset.section || $('#fSection').value || 1));
+  const ro = !(isNew ? can('add_plans') : can('edit_plans'));
+  $('#planTitle').textContent = isNew ? 'إضافة خطة علاجية' : `${ro ? 'عرض' : 'تعديل'} خطة ${p.subject} – ${classLabel(p)}`;
+  const subjOpts = allowedSubjects(), gradeOpts = allowedGrades();
+  fillSelect(f.subject, [...new Set([...subjOpts, p.subject])].map(s => [s, s]), false);
+  fillSelect(f.grade, [...new Set([...gradeOpts, +p.grade])].map(g => [g, 'الصف ' + GRADE_LONG[g]]), false);
   fillSelect(f.status, STATUSES.map(s => [s, s]), false);
   f.id.value = isNew ? '' : p.id;
   ['subject', 'grade', 'section', 'teacher', 'test_date', 'status', 'students_total', 'students_weak', 'start_date', 'end_date', 'pre_score', 'post_score', 'weak_skills', 'strategies', 'notes']
     .forEach(k => { f[k].value = p[k] ?? ''; });
   $('#compChecks').innerHTML = COMPONENTS.map(([k, t]) => `<label><input type="checkbox" name="c_${k}" ${p.components && p.components[k] ? 'checked' : ''}> ${t}</label>`).join('');
   $('#planErr').textContent = '';
+  [...f.elements].forEach(el => { if (el.type !== 'button' && el.type !== 'submit' && el.type !== 'hidden') el.disabled = ro; });
+  $('#planSave').hidden = ro;
   $('#planDialog').showModal();
 }
 async function savePlan(ev) {
@@ -415,16 +449,73 @@ function hBarChart(id, labels, data, color) {
 
 /* ---------------- المستخدمون ---------------- */
 async function loadUsers() {
-  try { state.users = await api.listUsers(state.emp) || []; renderUsers(); }
+  if (!$('#uPerms').children.length || $('#uRole').dataset.for !== state.emp) { buildUserForm(); $('#uRole').dataset.for = state.emp; }
+  try { state.users = (await api.listUsers(state.emp) || []).map(u => ({ ...u, perms: u.perms || {}, scope: u.scope || {} })); renderUsers(); }
   catch (e) { toast(errMsg(e), true); }
 }
+const ROLE_ORDER = ['admin', 'supervisor', 'teacher', 'viewer'];
+function scopeText(u) {
+  if (u.role === 'admin') return 'الكل';
+  const s = (u.scope || {}).subjects || [], g = (u.scope || {}).grades || [];
+  return (s.length ? s.join('، ') : 'كل المواد') + ' · ' + (g.length ? 'الصفوف: ' + g.map(x => GRADE_LONG[x]).join('، ') : 'كل الصفوف');
+}
+function permsText(u) {
+  if (u.role === 'admin') return 'كل الصلاحيات';
+  const l = PERMS.filter(([k]) => (u.perms || {})[k]).map(([, t]) => t);
+  return l.length ? l.join('، ') : 'عرض الخطط فقط';
+}
 function renderUsers() {
-  const rows = [...state.users].sort((a, b) => (a.role === 'admin' ? -1 : 1) - (b.role === 'admin' ? -1 : 1) || String(a.full_name).localeCompare(b.full_name, 'ar'));
-  $('#usersTbl').innerHTML = `<thead><tr><th>الرقم الوظيفي</th><th>الاسم</th><th>الصلاحية</th><th>الحالة</th><th></th></tr></thead><tbody>` +
-    (rows.length ? rows.map(u => `<tr><td class="num">${esc(u.emp_id)}</td><td>${esc(u.full_name)}</td><td>${u.role === 'admin' ? '<span class="pill admin">مدير</span>' : 'معلم'}</td>
+  const q = ($('#uSearch') && $('#uSearch').value.trim()) || '';
+  const rows = [...state.users].filter(u => !q || (u.emp_id + ' ' + u.full_name).includes(q))
+    .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || String(a.full_name).localeCompare(b.full_name, 'ar'));
+  const counts = ROLE_ORDER.map(r => [r, state.users.filter(u => u.role === r).length]).filter(([, n]) => n);
+  $('#usersSummary').innerHTML = `<b>${fmt(state.users.length)}</b> مستخدم — ` + counts.map(([r, n]) => `${ROLES[r]}: ${fmt(n)}`).join(' · ');
+  const editable = u => u.emp_id !== state.emp && (isAdmin() || u.role !== 'admin');
+  $('#usersTbl').innerHTML = `<thead><tr><th>الرقم الوظيفي</th><th>الاسم</th><th>الدور</th><th>نطاق الوصول</th><th>الصلاحيات</th><th>الحالة</th><th></th></tr></thead><tbody>` +
+    (rows.length ? rows.map(u => `<tr><td class="num">${esc(u.emp_id)}</td><td><b>${esc(u.full_name)}</b></td>
+      <td><span class="pill role-${esc(u.role)}">${esc(ROLES[u.role] || u.role)}</span></td>
+      <td class="wrap sm">${esc(scopeText(u))}</td><td class="wrap sm muted">${esc(permsText(u))}</td>
       <td><span class="pill ${u.active ? 's2' : 's0'}">${u.active ? 'مفعّل' : 'موقوف'}</span></td>
-      <td>${u.emp_id === state.emp ? '<span class="muted sm">حسابك</span>' : `<button class="icon-btn edit" data-toggle="${esc(u.emp_id)}">${u.active ? 'إيقاف' : 'تفعيل'}</button><button class="icon-btn del" data-udel="${esc(u.emp_id)}">حذف</button>`}</td></tr>`).join('')
-      : '<tr><td colspan="5" class="empty">لا يوجد مستخدمون</td></tr>') + '</tbody>';
+      <td>${u.emp_id === state.emp ? '<span class="muted sm">حسابك</span>' : editable(u) ? `<button class="icon-btn edit" data-uedit="${esc(u.emp_id)}">تعديل</button><button class="icon-btn edit" data-toggle="${esc(u.emp_id)}">${u.active ? 'إيقاف' : 'تفعيل'}</button><button class="icon-btn del" data-udel="${esc(u.emp_id)}">حذف</button>` : '<span class="muted sm">—</span>'}</td></tr>`).join('')
+      : '<tr><td colspan="7" class="empty">لا يوجد مستخدمون</td></tr>') + '</tbody>';
+}
+function buildUserForm() {
+  $('#uRole').innerHTML = ROLE_ORDER.filter(r => r !== 'admin' || isAdmin()).map(r => `<option value="${r}">${ROLES[r]}</option>`).join('');
+  $('#uPerms').innerHTML = PERMS.map(([k, t]) => `<label><input type="checkbox" name="perm_${k}" ${k === 'manage_users' && !isAdmin() ? 'data-locked="1"' : ''}> ${t}</label>`).join('');
+  $('#uSubjects').innerHTML = SUBJECTS.map(s => `<label><input type="checkbox" name="subj" value="${esc(s)}"> ${esc(s)}</label>`).join('');
+  $('#uGrades').innerHTML = [1, 2, 3, 4, 5, 6].map(g => `<label><input type="checkbox" name="grade" value="${g}"> الصف ${GRADE_LONG[g]}</label>`).join('');
+  resetUserForm();
+}
+function applyRoleToForm(fromPreset) {
+  const role = $('#uRole').value, isA = role === 'admin';
+  if (fromPreset) PERMS.forEach(([k]) => { $('#userForm')['perm_' + k].checked = !!PRESETS[role][k]; });
+  PERMS.forEach(([k]) => { const el = $('#userForm')['perm_' + k]; el.disabled = isA || !!el.dataset.locked; if (isA) el.checked = true; });
+  $$('#uSubjects input, #uGrades input').forEach(el => { el.disabled = isA; if (isA) el.checked = false; });
+  $('#uScopeNote').hidden = !isA;
+}
+function resetUserForm() {
+  const f = $('#userForm'); f.reset(); f.dataset.editing = '';
+  $('#uEmp').readOnly = false; $('#uRole').value = 'teacher'; applyRoleToForm(true);
+  $('#uSave').textContent = 'إضافة المستخدم'; $('#uCancel').hidden = true; $('#uFormTitle').textContent = 'إضافة مستخدم جديد';
+}
+function editUser(u) {
+  const f = $('#userForm'); f.dataset.editing = u.emp_id;
+  $('#uEmp').value = u.emp_id; $('#uEmp').readOnly = true; $('#uName').value = u.full_name; $('#uRole').value = u.role;
+  PERMS.forEach(([k]) => { f['perm_' + k].checked = !!(u.perms || {})[k]; });
+  const s = (u.scope || {}).subjects || [], g = ((u.scope || {}).grades || []).map(Number);
+  $$('#uSubjects input').forEach(el => { el.checked = s.includes(el.value); });
+  $$('#uGrades input').forEach(el => { el.checked = g.includes(+el.value); });
+  applyRoleToForm(false);
+  $('#uSave').textContent = 'حفظ التعديلات'; $('#uCancel').hidden = false; $('#uFormTitle').textContent = 'تعديل المستخدم: ' + u.full_name;
+  f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function readUserForm() {
+  const f = $('#userForm'), role = $('#uRole').value;
+  const perms = {}; PERMS.forEach(([k]) => { if (role === 'admin' || f['perm_' + k].checked) perms[k] = true; });
+  const subjects = role === 'admin' ? [] : $$('#uSubjects input:checked').map(el => el.value);
+  const grades = role === 'admin' ? [] : $$('#uGrades input:checked').map(el => +el.value);
+  const prev = state.users.find(x => x.emp_id === f.dataset.editing);
+  return { emp_id: $('#uEmp').value.trim(), full_name: $('#uName').value.trim(), role, active: prev ? prev.active : true, perms, scope: { subjects, grades } };
 }
 
 /* ---------------- الأحداث ---------------- */
@@ -466,12 +557,19 @@ function bind() {
 
   $('#userForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const u = { emp_id: $('#uEmp').value.trim(), full_name: $('#uName').value.trim(), role: $('#uRole').value, active: true };
+    const u = readUserForm(), editing = $('#userForm').dataset.editing;
     if (!u.emp_id || !u.full_name) return;
-    try { await api.saveUser(state.emp, u); $('#userForm').reset(); await loadUsers(); toast('تم حفظ المستخدم'); } catch (err) { toast(errMsg(err), true); }
+    if (!editing && state.users.some(x => x.emp_id === u.emp_id)) return toast('هذا الرقم الوظيفي مسجل مسبقاً، استخدم تعديل', true);
+    const b = $('#uSave'); b.disabled = true;
+    try { await api.saveUser(state.emp, u); resetUserForm(); await loadUsers(); toast(editing ? 'تم حفظ التعديلات' : 'تمت إضافة المستخدم'); }
+    catch (err) { toast(errMsg(err), true); } finally { b.disabled = false; }
   });
+  $('#uRole').addEventListener('change', () => applyRoleToForm(true));
+  $('#uCancel').onclick = resetUserForm;
+  $('#uSearch').addEventListener('input', renderUsers);
   $('#usersTbl').addEventListener('click', async e => {
-    const t = e.target.closest('[data-toggle]'), d = e.target.closest('[data-udel]');
+    const t = e.target.closest('[data-toggle]'), d = e.target.closest('[data-udel]'), ed = e.target.closest('[data-uedit]');
+    if (ed) return editUser(state.users.find(x => x.emp_id === ed.dataset.uedit));
     try {
       if (t) { const u = state.users.find(x => x.emp_id === t.dataset.toggle); await api.saveUser(state.emp, { ...u, active: !u.active }); await loadUsers(); }
       if (d && await confirmBox('حذف الرقم ' + d.dataset.udel + ' من قائمة الدخول؟')) { await api.deleteUser(state.emp, d.dataset.udel); await loadUsers(); toast('تم الحذف'); }
@@ -479,7 +577,7 @@ function bind() {
   });
 }
 
-window.RP = { state, api, SUBJECTS, STRUCTURE, COMPONENTS, STATUSES, GRADE_LONG, GRADE_SHORT, completion, classLabel, esc, fmt, num, toast, errMsg, openPlan, loadPlans, showView, defaultOrder, isAdmin };
+window.RP = { state, api, SUBJECTS, STRUCTURE, COMPONENTS, STATUSES, GRADE_LONG, GRADE_SHORT, completion, classLabel, esc, fmt, num, toast, errMsg, openPlan, loadPlans, showView, defaultOrder, isAdmin, can, subjectsOf };
 
 async function init() {
   bind();

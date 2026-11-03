@@ -7,9 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E%3Crect width=%2248%22 height=%2248%22 rx=%2212%22 fill=%22%230f5f4f%22/%3E%3Cpath d=%22M14 25l7 7 13-14%22 fill=%22none%22 stroke=%22white%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
-<script src="config.js?v=2"></script>
+<script src="config.js?v=3"></script>
 </head>
 <body>
 
@@ -43,7 +43,7 @@
       <button class="tab active" data-view="dashboard">لوحة الإحصاء</button>
       <button class="tab" data-view="plans">الخطط العلاجية</button>
       <button class="tab" data-view="folders">المجلدات</button>
-      <button class="tab admin-only" data-view="users">المستخدمون</button>
+      <button class="tab" data-view="users" hidden>المستخدمون</button>
     </nav>
     <div class="who">
       <span id="whoName"></span>
@@ -118,13 +118,23 @@
 
     <!-- المستخدمون -->
     <section id="view-users" class="view" hidden>
-      <div class="view-head"><h2>إدارة أرقام الدخول</h2></div>
-      <form id="userForm" class="card filters">
-        <input id="uEmp" required inputmode="numeric" placeholder="الرقم الوظيفي">
-        <input id="uName" required placeholder="الاسم">
-        <select id="uRole"><option value="teacher">معلم</option><option value="admin">مدير</option></select>
-        <button class="btn primary" type="submit">حفظ المستخدم</button>
+      <div class="view-head"><h2>المستخدمون والصلاحيات</h2><p class="muted sm" id="usersSummary"></p></div>
+      <form id="userForm" class="card uform" autocomplete="off">
+        <h3 id="uFormTitle">إضافة مستخدم جديد</h3>
+        <div class="form-grid">
+          <label>الرقم الوظيفي<input id="uEmp" required inputmode="numeric" placeholder="مثال: 193886"></label>
+          <label>الاسم<input id="uName" required placeholder="اسم المستخدم"></label>
+          <label>الدور<select id="uRole"></select></label>
+        </div>
+        <fieldset><legend>الصلاحيات</legend><div class="checks three" id="uPerms"></div>
+          <p class="hint">اختيار الدور يضبط الصلاحيات الافتراضية، ويمكنك تعديلها لكل مستخدم.</p></fieldset>
+        <fieldset><legend>نطاق الوصول — المواد</legend><div class="checks four" id="uSubjects"></div></fieldset>
+        <fieldset><legend>نطاق الوصول — الصفوف</legend><div class="checks six" id="uGrades"></div>
+          <p class="hint" id="uScopeHint">اترك المواد أو الصفوف دون تحديد ليصل المستخدم إلى الكل. المستخدم لا يرى ولا يعدّل إلا الخطط داخل نطاقه.</p>
+          <p class="hint" id="uScopeNote" hidden>المدير يصل إلى كل المواد والصفوف وله كل الصلاحيات.</p></fieldset>
+        <div class="actions" style="margin-top:1rem"><button class="btn primary" type="submit" id="uSave">إضافة المستخدم</button><button class="btn ghost" type="button" id="uCancel" hidden>إلغاء التعديل</button></div>
       </form>
+      <div class="filters"><input id="uSearch" type="search" placeholder="بحث بالاسم أو الرقم الوظيفي…"></div>
       <div class="table-wrap card flush"><table class="tbl" id="usersTbl"></table></div>
     </section>
   </main>
@@ -176,7 +186,7 @@
 </dialog>
 
 <div id="toast" role="status"></div>
-<script src="app.js?v=2"></script>
-<script src="folders.js?v=2"></script>
+<script src="app.js?v=3"></script>
+<script src="folders.js?v=3"></script>
 </body>
 </html>
