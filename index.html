@@ -42,6 +42,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" data-view="dashboard">لوحة الإحصاء</button>
       <button class="tab" data-view="plans">الخطط العلاجية</button>
+      <button class="tab" data-view="folders">المجلدات</button>
       <button class="tab admin-only" data-view="users">المستخدمون</button>
     </nav>
     <div class="who">
@@ -107,6 +108,14 @@
       <div class="table-wrap card flush"><table class="tbl" id="plansTbl"></table></div>
     </section>
 
+    <!-- المجلدات -->
+    <section id="view-folders" class="view" hidden>
+      <div class="view-head"><h2>تصفح مجلدات المواد</h2></div>
+      <nav class="crumbs card" id="crumbs" aria-label="المسار"></nav>
+      <div id="foldersBody"></div>
+      <p class="muted sm">روابط OneDrive تفتح المجلدات الفعلية، ويلزم أن يكون لدى المستخدم صلاحية الوصول إليها.</p>
+    </section>
+
     <!-- المستخدمون -->
     <section id="view-users" class="view" hidden>
       <div class="view-head"><h2>إدارة أرقام الدخول</h2></div>
@@ -168,5 +177,6 @@
 
 <div id="toast" role="status"></div>
 <script src="app.js"></script>
+<script src="folders.js"></script>
 </body>
 </html>

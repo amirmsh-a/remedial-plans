@@ -4,19 +4,20 @@
 const CFG = window.APP_CONFIG || {};
 const DEMO = !(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 
-const SUBJECTS = ['الرياضيات', 'العلوم'];
+const SUBJECTS = ['الرياضيات', 'العلوم', 'اللغة العربية', 'اللغة الإنجليزية'];
 const GRADE_LONG = ['', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس'];
 const GRADE_SHORT = ['', 'أول', 'ثاني', 'ثالث', 'رابع', 'خامس', 'سادس'];
 // بنية المجلد: المادة → الصف → عدد الفصول
-const STRUCTURE = {
-  'الرياضيات': { 1: 4, 2: 3, 3: 5, 4: 6, 5: 7, 6: 7 },
-  'العلوم':    { 1: 4, 2: 3, 3: 5, 5: 7 }
-};
+const SECTIONS = { 1: 4, 2: 3, 3: 5, 4: 6, 5: 7, 6: 7 };
+const STRUCTURE = Object.fromEntries(SUBJECTS.map(s => [s, SECTIONS]));
+const SUBJ_ABBR = { 'الرياضيات': 'ر', 'العلوم': 'ع', 'اللغة العربية': 'عر', 'اللغة الإنجليزية': 'En' };
+const SUBJ_COLOR = { 'الرياضيات': '#14806a', 'العلوم': '#3d6fb6', 'اللغة العربية': '#c8912b', 'اللغة الإنجليزية': '#8a4fb0' };
+// [المفتاح، الاسم، اسم المجلد في OneDrive]
 const COMPONENTS = [
-  ['results', 'نتائج الطلاب'], ['classification', 'تصنيف الطلاب'],
-  ['plan', 'الخطة العلاجية'], ['evidence', 'شواهد الخطة العلاجية'],
-  ['followup', 'سجل المتابعة'], ['parents', 'إشعارات أولياء الأمور'],
-  ['curriculum', 'توزيع المنهج'], ['impact', 'قياس أثر الخطة العلاجية']
+  ['results', 'نتائج الطلاب', 'نتائج الطلاب'], ['classification', 'تصنيف الطلاب', 'تصنيف الطلاب'],
+  ['plan', 'الخطة العلاجية', 'الخطط العلاجية'], ['evidence', 'شواهد الخطة العلاجية', 'شواهد الخطط العلاجية'],
+  ['followup', 'سجل المتابعة', 'سجل المتابعة'], ['parents', 'إشعارات أولياء الأمور', 'إشعارات أولياء الأمور'],
+  ['curriculum', 'توزيع المنهج', 'توزيع المنهج'], ['impact', 'قياس أثر الخطة العلاجية', 'قياس أثر الخطة العلاجية']
 ];
 const STATUSES = ['لم تبدأ', 'قيد التنفيذ', 'مكتملة'];
 const SESSION_KEY = 'rp_session_v1';
@@ -156,7 +157,7 @@ async function doLogin(emp, silent) {
   $('#whoName').textContent = u.full_name + (u.role === 'admin' ? ' · مدير' : '');
   $$('.admin-only').forEach(el => el.hidden = !isAdmin());
   await loadPlans();
-  showView(state.view);
+  showView(location.hash.startsWith('#folders') ? 'folders' : state.view);
   if (!silent) toast('أهلاً ' + u.full_name);
 }
 function logout() {
@@ -179,6 +180,8 @@ function showView(v) {
   if (v === 'dashboard') renderDashboard();
   if (v === 'plans') renderPlans();
   if (v === 'users') loadUsers();
+  if (v === 'folders' && window.renderFolders) window.renderFolders();
+  if (v !== 'folders' && location.hash.startsWith('#folders')) history.replaceState(null, '', location.pathname + location.search);
 }
 
 /* ---------------- الفلاتر ---------------- */
@@ -250,9 +253,9 @@ function renderPlans() {
 }
 
 /* ---------------- نموذج الخطة ---------------- */
-function openPlan(p) {
-  const f = $('#planForm'); const isNew = !p;
-  p = p || blankPlan($('#fSubject').value || SUBJECTS[0], +($('#fGrade').value || 1), +($('#fSection').value || 1));
+function openPlan(p, preset) {
+  const f = $('#planForm'); const isNew = !p; preset = preset || {};
+  p = p || blankPlan(preset.subject || $('#fSubject').value || SUBJECTS[0], +(preset.grade || $('#fGrade').value || 1), +(preset.section || $('#fSection').value || 1));
   $('#planTitle').textContent = isNew ? 'إضافة خطة علاجية' : `تعديل خطة ${p.subject} – ${classLabel(p)}`;
   fillSelect(f.subject, [...new Set([...SUBJECTS, p.subject])].map(s => [s, s]), false);
   fillSelect(f.grade, [1, 2, 3, 4, 5, 6].map(g => [g, 'الصف ' + GRADE_LONG[g]]), false);
@@ -282,7 +285,7 @@ async function savePlan(ev) {
   const btn = $('#planSave'); btn.disabled = true;
   try {
     await api.savePlan(state.emp, p);
-    $('#planDialog').close(); await loadPlans(); renderPlans(); toast('تم حفظ الخطة');
+    $('#planDialog').close(); await loadPlans(); showView(state.view); toast('تم حفظ الخطة');
   } catch (e) { $('#planErr').textContent = errMsg(e); }
   finally { btn.disabled = false; }
 }
@@ -327,10 +330,10 @@ function renderDashboard() {
   ].map(([l, v, s, c]) => `<div class="kpi ${c}"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${s}</div></div>`).join('');
 
   const showSubj = !$('#dSubject').value;
-  const labels = rows.map(p => (showSubj ? (p.subject === 'الرياضيات' ? 'ر' : p.subject === 'العلوم' ? 'ع' : p.subject.slice(0, 2)) + ' ' : '') + GRADE_SHORT[p.grade] + ' ' + p.section);
+  const labels = rows.map(p => (showSubj ? (SUBJ_ABBR[p.subject] || p.subject.slice(0, 2)) + ' ' : '') + GRADE_SHORT[p.grade] + ' ' + p.section);
   const full = rows.map(p => p.subject + ' – ' + classLabel(p));
-  const colors = rows.map(p => p.subject === 'العلوم' ? PALETTE.sci : PALETTE.math);
-  const legendSubj = showSubj ? [['الرياضيات (ر)', PALETTE.math], ['العلوم (ع)', PALETTE.sci]] : null;
+  const colors = rows.map(p => SUBJ_COLOR[p.subject] || PALETTE.math);
+  const legendSubj = showSubj ? [...new Set(rows.map(p => p.subject))].map(s => [s + ' (' + (SUBJ_ABBR[s] || s.slice(0, 2)) + ')', SUBJ_COLOR[s] || PALETTE.math]) : null;
 
   barChart('cCompletion', { labels, full, max: 100, suffix: '%', legend: legendSubj, series: [{ name: 'الإنجاز', data: comp, colors }] });
   const weakPct = rows.map(p => num(p.students_total) ? +(100 * (num(p.students_weak) || 0) / p.students_total).toFixed(1) : null);
@@ -392,7 +395,7 @@ function barChart(id, { labels, full, series, max, suffix = '', legend }) {
     svg += `<text transform="translate(${cx + 3},${H - padB + 10}) rotate(-60)" text-anchor="end" font-size="10.5" fill="#5d6b67">${esc(lab)}</text>`;
   });
   svg += `<line x1="${padL}" x2="${W - padR}" y1="${H - padB}" y2="${H - padB}" stroke="#cfd8d5"/>`;
-  if (legend) { let lx = W - padR; legend.forEach(([t, c]) => { svg += `<rect x="${lx - 12}" y="6" width="12" height="12" rx="3" fill="${c}"/><text x="${lx - 18}" y="16" font-size="12" text-anchor="end" fill="#15231f">${esc(t)}</text>`; lx -= 30 + t.length * 7; }); }
+  if (legend) { let lx = W - padR; legend.forEach(([t, c]) => { svg += `<rect x="${lx - 12}" y="6" width="12" height="12" rx="3" fill="${c}"/><text x="${lx - 18}" y="16" font-size="12" text-anchor="end" fill="#15231f">${esc(t)}</text>`; lx -= 30 + t.length * 6.2; }); }
   el.innerHTML = `<div class="chart-scroll">${svg}</svg></div>`;
 }
 function hBarChart(id, labels, data, color) {
@@ -475,6 +478,8 @@ function bind() {
     } catch (err) { toast(errMsg(err), true); }
   });
 }
+
+window.RP = { state, api, SUBJECTS, STRUCTURE, COMPONENTS, STATUSES, GRADE_LONG, GRADE_SHORT, completion, classLabel, esc, fmt, num, toast, errMsg, openPlan, loadPlans, showView, defaultOrder, isAdmin };
 
 async function init() {
   bind();
