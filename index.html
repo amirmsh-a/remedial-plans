@@ -7,18 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E%3Crect width=%2248%22 height=%2248%22 rx=%2212%22 fill=%22%230f5f4f%22/%3E%3Cpath d=%22M14 25l7 7 13-14%22 fill=%22none%22 stroke=%22white%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
-<script src="config.js?v=7"></script>
+<script src="config.js?v=8"></script>
 </head>
 <body>
 
 <!-- تسجيل الدخول -->
 <div id="login" class="login-wrap">
   <form id="loginForm" class="login-card" autocomplete="off">
-    <div class="login-mark">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 38V12a4 4 0 0 1 4-4h18l10 10v20a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4z" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 26l5 5 11-11" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
+    <img class="login-logo" src="logo.webp?v=1" alt="مدارس ابن خلدون – معارف" width="267" height="96">
     <h1>الخطط العلاجية للاختبار التكويني</h1>
     <p class="muted" id="loginSchool"></p>
     <label for="empId">الرقم الوظيفي</label>
@@ -27,13 +25,14 @@
     <p class="err" id="loginErr" role="alert"></p>
     <p class="hint" id="demoHint" hidden>وضع تجريبي: استخدم الرقم <b>1000</b> للدخول كمدير.</p>
   </form>
+  <p class="copy">© جميع الحقوق محفوظة - الوكيل التعليمي / أمير المشد</p>
 </div>
 
 <!-- التطبيق -->
 <div id="app" hidden>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-dot"></span>
+      <img class="brand-logo" src="logo.webp?v=1" alt="مدارس ابن خلدون – معارف" width="267" height="96">
       <div>
         <strong>الخطط العلاجية للاختبار التكويني</strong>
         <small id="brandSub"></small>
@@ -140,7 +139,7 @@
       <div class="table-wrap card flush"><table class="tbl" id="usersTbl"></table></div>
     </section>
   </main>
-  <footer class="foot" id="foot"></footer>
+  <footer class="foot"><div id="foot"></div><p class="copy">© جميع الحقوق محفوظة - الوكيل التعليمي / أمير المشد</p></footer>
 </div>
 
 <!-- نافذة الخطة -->
@@ -209,7 +208,7 @@
 </dialog>
 
 <div id="toast" role="status"></div>
-<script src="app.js?v=7"></script>
-<script src="folders.js?v=7"></script>
+<script src="app.js?v=8"></script>
+<script src="folders.js?v=8"></script>
 </body>
 </html>
