@@ -55,8 +55,10 @@ function linkList(t, empty = '') {
 }
 function canAddAt(t) {
   if (!RP.can('add_links')) return false;
-  const u = RP.state.user, sc = (u && u.role !== 'admin' && u.scope) || {};
-  return !(t.grade == null && (sc.grades || []).length);
+  const u = RP.state.user, sc = (u && u.role !== 'admin' && u.scope) || {}, cls = sc.classes || [];
+  if (t.grade == null) return !(sc.grades || []).length && !cls.length;
+  if (t.section == null) return !cls.some(c => c.split('-')[0] === String(t.grade));
+  return true;
 }
 function linkTools(t) {
   if (!canAddAt(t)) return '';

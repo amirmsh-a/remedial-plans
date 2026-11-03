@@ -96,9 +96,9 @@ const localApi = {
   _plans() { let p = store.get(DEMO_PLANS_KEY, null); if (!p) { p = demoSeed(); store.set(DEMO_PLANS_KEY, p); } return p; },
   _check(e, perm) { const u = this._users().find(x => x.emp_id === String(e).trim() && x.active); if (!u) throw new Error('unauthorized'); if (perm && !userCan(u, perm)) throw new Error('forbidden'); return u; },
   async login(e) { const u = this._check(e); return { emp_id: u.emp_id, full_name: u.full_name, role: u.role, perms: u.perms || {}, scope: u.scope || {} }; },
-  async listPlans(e) { const u = this._check(e); return this._plans().filter(p => inScope(u, p.subject, p.grade)); },
+  async listPlans(e) { const u = this._check(e); return this._plans().filter(p => inScope(u, p.subject, p.grade, p.section)); },
   async savePlan(e, p) {
-    const u = this._check(e, p.id ? 'edit_plans' : 'add_plans'); if (!inScope(u, p.subject, p.grade)) throw new Error('forbidden'); const all = this._plans();
+    const u = this._check(e, p.id ? 'edit_plans' : 'add_plans'); if (!inScope(u, p.subject, p.grade, p.section)) throw new Error('forbidden'); const all = this._plans();
     const row = { ...p, updated_by: u.full_name, updated_at: new Date().toISOString() };
     const i = all.findIndex(x => x.id === p.id);
     if (i >= 0) all[i] = row; else { row.id = uid(); all.push(row); }
@@ -113,10 +113,10 @@ const localApi = {
     if (i >= 0) all[i] = { ...all[i], ...u }; else all.push(u); store.set(DEMO_USERS_KEY, all); return true;
   },
   _links() { return store.get('rp_demo_links', []); },
-  async listLinks(e) { const u = this._check(e); return this._links().filter(l => u.role === 'admin' || ((!(u.scope || {}).subjects || !u.scope.subjects.length || u.scope.subjects.includes(l.subject)) && (l.grade == null || !(u.scope || {}).grades || !u.scope.grades.length || u.scope.grades.includes(l.grade)))); },
+  async listLinks(e) { const u = this._check(e); return this._links().filter(l => u.role === 'admin' || (l.grade == null ? (!((u.scope || {}).subjects || []).length || u.scope.subjects.includes(l.subject)) : inScope(u, l.subject, l.grade, l.section))); },
   async addLink(e, l) {
     const u = this._check(e, 'add_links'); const g = (u.scope || {}).grades || [];
-    if (!inScope(u, l.subject, l.grade || (g.length ? -1 : 1))) throw new Error('forbidden');
+    if (!inScope(u, l.subject, l.grade || (g.length ? -1 : 1), l.section)) throw new Error('forbidden');
     if (!/^https:\/\/\S+$/i.test(l.url || '')) throw new Error('الرابط يجب أن يبدأ بـ https://');
     let all = this._links(); const norm = v => v == null || v === '' ? null : v;
     const row = { id: uid(), subject: l.subject, grade: norm(l.grade), section: norm(l.section), component: norm(l.component), kind: l.kind || 'file', title: l.title || (l.kind === 'folder' ? 'رابط مشاركة المجلد' : 'رابط'), url: l.url, added_by: u.full_name, added_by_emp: u.emp_id, created_at: new Date().toISOString() };
@@ -141,10 +141,15 @@ const PRESETS = {
   viewer: { view_dashboard: true, export: true }
 };
 function userCan(u, p) { return u.role === 'admin' || !!(u.perms || {})[p]; }
-function inScope(u, subject, grade) {
+// النطاق: المواد + الصفوف + الفصول (classes = ["4-1","4-3"]؛ صف بلا فصول محددة = كل فصوله)
+function inScope(u, subject, grade, section) {
   if (u.role === 'admin') return true;
-  const s = (u.scope || {}).subjects || [], g = (u.scope || {}).grades || [];
-  return (!s.length || s.includes(subject)) && (!g.length || g.includes(+grade));
+  const sc = u.scope || {}, s = sc.subjects || [], g = sc.grades || [], c = sc.classes || [];
+  if (s.length && !s.includes(subject)) return false;
+  if (g.length && !g.includes(+grade)) return false;
+  if (section == null) return true;
+  const own = c.filter(x => x.split('-')[0] === String(+grade));
+  return !own.length || own.includes(+grade + '-' + +section);
 }
 
 /* ---------------- الحالة ---------------- */
@@ -472,8 +477,10 @@ async function loadUsers() {
 const ROLE_ORDER = ['admin', 'supervisor', 'teacher', 'viewer'];
 function scopeText(u) {
   if (u.role === 'admin') return 'الكل';
-  const s = (u.scope || {}).subjects || [], g = (u.scope || {}).grades || [];
-  return (s.length ? s.join('، ') : 'كل المواد') + ' · ' + (g.length ? 'الصفوف: ' + g.map(x => GRADE_LONG[x]).join('، ') : 'كل الصفوف');
+  const s = (u.scope || {}).subjects || [], g = (u.scope || {}).grades || [], c = (u.scope || {}).classes || [];
+  const gradeText = x => { const own = c.filter(k => k.split('-')[0] === String(x)).map(k => k.split('-')[1]).sort((a, b) => a - b);
+    return GRADE_LONG[x] + (own.length ? ' (فصل ' + own.join('، ') + ')' : ''); };
+  return (s.length ? s.join('، ') : 'كل المواد') + ' · ' + (g.length ? 'الصفوف: ' + [...g].sort((a, b) => a - b).map(gradeText).join('، ') : 'كل الصفوف');
 }
 function permsText(u) {
   if (u.role === 'admin') return 'كل الصلاحيات';
@@ -502,16 +509,27 @@ function buildUserForm() {
   $('#uGrades').innerHTML = [1, 2, 3, 4, 5, 6].map(g => `<label><input type="checkbox" name="grade" value="${g}"> الصف ${GRADE_LONG[g]}</label>`).join('');
   resetUserForm();
 }
+// اختيار الفصول لكل صف محدد
+function renderClassPicker(keep) {
+  const sel = new Set(keep || $$('#uClasses input:checked').map(el => el.value));
+  const grades = $$('#uGrades input:checked').map(el => +el.value).sort((a, b) => a - b);
+  const dis = $('#uRole').value === 'admin';
+  $('#uClasses').innerHTML = grades.length
+    ? grades.map(g => `<div class="cgroup"><b>الصف ${GRADE_LONG[g]}</b><div class="checks six">${Array.from({ length: SECTIONS[g] || 0 }, (_, i) => i + 1)
+        .map(n => `<label><input type="checkbox" value="${g}-${n}" ${sel.has(g + '-' + n) ? 'checked' : ''} ${dis ? 'disabled' : ''}> فصل ${GRADE_SHORT[g]} ${n}</label>`).join('')}</div></div>`).join('')
+    : '<p class="hint" style="margin:0">اختر صفاً أو أكثر أعلاه لتظهر فصوله ويمكنك تحديد فصول بعينها.</p>';
+}
 function applyRoleToForm(fromPreset) {
   const role = $('#uRole').value, isA = role === 'admin';
   if (fromPreset) PERMS.forEach(([k]) => { $('#userForm')['perm_' + k].checked = !!PRESETS[role][k]; });
   PERMS.forEach(([k]) => { const el = $('#userForm')['perm_' + k]; el.disabled = isA || !!el.dataset.locked; if (isA) el.checked = true; });
   $$('#uSubjects input, #uGrades input').forEach(el => { el.disabled = isA; if (isA) el.checked = false; });
   $('#uScopeNote').hidden = !isA;
+  renderClassPicker(isA ? [] : undefined);
 }
 function resetUserForm() {
   const f = $('#userForm'); f.reset(); f.dataset.editing = '';
-  $('#uEmp').readOnly = false; $('#uRole').value = 'teacher'; applyRoleToForm(true);
+  $('#uEmp').readOnly = false; $('#uRole').value = 'teacher'; $('#uClasses').innerHTML = ''; applyRoleToForm(true);
   $('#uSave').textContent = 'إضافة المستخدم'; $('#uCancel').hidden = true; $('#uFormTitle').textContent = 'إضافة مستخدم جديد';
 }
 function editUser(u) {
@@ -521,6 +539,7 @@ function editUser(u) {
   const s = (u.scope || {}).subjects || [], g = ((u.scope || {}).grades || []).map(Number);
   $$('#uSubjects input').forEach(el => { el.checked = s.includes(el.value); });
   $$('#uGrades input').forEach(el => { el.checked = g.includes(+el.value); });
+  renderClassPicker((u.scope || {}).classes || []);
   applyRoleToForm(false);
   $('#uSave').textContent = 'حفظ التعديلات'; $('#uCancel').hidden = false; $('#uFormTitle').textContent = 'تعديل المستخدم: ' + u.full_name;
   f.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -530,8 +549,9 @@ function readUserForm() {
   const perms = {}; PERMS.forEach(([k]) => { if (role === 'admin' || f['perm_' + k].checked) perms[k] = true; });
   const subjects = role === 'admin' ? [] : $$('#uSubjects input:checked').map(el => el.value);
   const grades = role === 'admin' ? [] : $$('#uGrades input:checked').map(el => +el.value);
+  const classes = role === 'admin' ? [] : $$('#uClasses input:checked').map(el => el.value).filter(v => grades.includes(+v.split('-')[0]));
   const prev = state.users.find(x => x.emp_id === f.dataset.editing);
-  return { emp_id: $('#uEmp').value.trim(), full_name: $('#uName').value.trim(), role, active: prev ? prev.active : true, perms, scope: { subjects, grades } };
+  return { emp_id: $('#uEmp').value.trim(), full_name: $('#uName').value.trim(), role, active: prev ? prev.active : true, perms, scope: { subjects, grades, classes } };
 }
 
 /* ---------------- الأحداث ---------------- */
@@ -581,6 +601,7 @@ function bind() {
     catch (err) { toast(errMsg(err), true); } finally { b.disabled = false; }
   });
   $('#uRole').addEventListener('change', () => applyRoleToForm(true));
+  $('#uGrades').addEventListener('change', () => renderClassPicker());
   $('#uCancel').onclick = resetUserForm;
   $('#uSearch').addEventListener('input', renderUsers);
   $('#usersTbl').addEventListener('click', async e => {

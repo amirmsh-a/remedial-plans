@@ -186,5 +186,7 @@ a.od:hover{background:var(--brand-soft)}
 .tag{display:inline-block;font-size:.7rem;font-weight:700;color:#2f5aa0;background:#e8eef9;border-radius:99px;padding:0 .45rem;margin-inline-start:.2rem}
 .lpanel h3{display:flex;align-items:center;gap:.4rem;font-size:.95rem}
 .lpanel .links{margin-top:.6rem}
+.cgroup{margin-bottom:.6rem}
+.cgroup>b{display:block;font-size:.85rem;color:var(--ink);margin-bottom:.3rem}
 @media (max-width:900px){.checks.four,.checks.six{grid-template-columns:repeat(3,minmax(0,1fr))}.checks.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.checks.three,.checks.four,.checks.six{grid-template-columns:repeat(2,minmax(0,1fr))}}
