@@ -61,7 +61,10 @@ const remoteApi = {
   deletePlan: (e, id) => rpc('plan_delete', { p_emp: e, p_id: id }),
   listUsers: e => rpc('users_list', { p_emp: e }),
   saveUser: (e, u) => rpc('user_save', { p_emp: e, p_id: u.emp_id, p_name: u.full_name, p_role: u.role, p_active: u.active, p_perms: u.perms || {}, p_scope: u.scope || {} }),
-  deleteUser: (e, id) => rpc('user_delete', { p_emp: e, p_id: id })
+  deleteUser: (e, id) => rpc('user_delete', { p_emp: e, p_id: id }),
+  listLinks: e => rpc('links_list', { p_emp: e }),
+  addLink: (e, l) => rpc('link_add', { p_emp: e, p: l }),
+  deleteLink: (e, id) => rpc('link_delete', { p_emp: e, p_id: id })
 };
 
 function blankPlan(subject, grade, section) {
@@ -109,6 +112,18 @@ const localApi = {
     const all = this._users(); const i = all.findIndex(x => x.emp_id === u.emp_id);
     if (i >= 0) all[i] = { ...all[i], ...u }; else all.push(u); store.set(DEMO_USERS_KEY, all); return true;
   },
+  _links() { return store.get('rp_demo_links', []); },
+  async listLinks(e) { const u = this._check(e); return this._links().filter(l => u.role === 'admin' || ((!(u.scope || {}).subjects || !u.scope.subjects.length || u.scope.subjects.includes(l.subject)) && (l.grade == null || !(u.scope || {}).grades || !u.scope.grades.length || u.scope.grades.includes(l.grade)))); },
+  async addLink(e, l) {
+    const u = this._check(e, 'add_links'); const g = (u.scope || {}).grades || [];
+    if (!inScope(u, l.subject, l.grade || (g.length ? -1 : 1))) throw new Error('forbidden');
+    if (!/^https:\/\/\S+$/i.test(l.url || '')) throw new Error('الرابط يجب أن يبدأ بـ https://');
+    let all = this._links(); const norm = v => v == null || v === '' ? null : v;
+    const row = { id: uid(), subject: l.subject, grade: norm(l.grade), section: norm(l.section), component: norm(l.component), kind: l.kind || 'file', title: l.title || (l.kind === 'folder' ? 'رابط مشاركة المجلد' : 'رابط'), url: l.url, added_by: u.full_name, added_by_emp: u.emp_id, created_at: new Date().toISOString() };
+    if (row.kind === 'folder') all = all.filter(x => !(x.kind === 'folder' && x.subject === row.subject && x.grade === row.grade && x.section === row.section && x.component === row.component));
+    all.push(row); store.set('rp_demo_links', all); return row;
+  },
+  async deleteLink(e, id) { const u = this._check(e); const l = this._links().find(x => x.id === id); if (!l) return false; if (l.added_by_emp !== u.emp_id && !userCan(u, 'delete_plans')) throw new Error('forbidden'); store.set('rp_demo_links', this._links().filter(x => x.id !== id)); return true; },
   async deleteUser(e, id) { const me = this._check(e, 'manage_users'); if (me.emp_id === id) throw new Error('لا يمكنك حذف حسابك'); store.set(DEMO_USERS_KEY, this._users().filter(x => x.emp_id !== id)); return true; }
 };
 const api = DEMO ? localApi : remoteApi;
@@ -117,12 +132,12 @@ const api = DEMO ? localApi : remoteApi;
 const ROLES = { admin: 'مدير', supervisor: 'مشرف', teacher: 'معلم', viewer: 'مشاهد' };
 const PERMS = [
   ['view_dashboard', 'عرض لوحة الإحصاء'], ['add_plans', 'إضافة خطط'], ['edit_plans', 'تعديل الخطط وتعبئتها'],
-  ['delete_plans', 'حذف الخطط'], ['export', 'تصدير البيانات'], ['manage_users', 'إدارة المستخدمين']
+  ['delete_plans', 'حذف الخطط'], ['export', 'تصدير البيانات'], ['add_links', 'إضافة روابط للمجلدات'], ['manage_users', 'إدارة المستخدمين']
 ];
 const PRESETS = {
   admin: Object.fromEntries(PERMS.map(([k]) => [k, true])),
-  supervisor: { view_dashboard: true, add_plans: true, edit_plans: true, delete_plans: true, export: true },
-  teacher: { view_dashboard: true, edit_plans: true },
+  supervisor: { view_dashboard: true, add_plans: true, edit_plans: true, delete_plans: true, export: true, add_links: true },
+  teacher: { view_dashboard: true, edit_plans: true, add_links: true },
   viewer: { view_dashboard: true, export: true }
 };
 function userCan(u, p) { return u.role === 'admin' || !!(u.perms || {})[p]; }
@@ -189,7 +204,8 @@ async function doLogin(emp, silent) {
   if (!silent) toast('أهلاً ' + u.full_name);
 }
 function logout() {
-  store.del(SESSION_KEY); state.user = state.emp = null; state.plans = [];
+  store.del(SESSION_KEY); state.user = state.emp = null; state.plans = []; state.view = 'dashboard';
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   $('#app').hidden = true; $('#login').hidden = false; $('#empId').value = ''; $('#empId').focus();
 }
 
