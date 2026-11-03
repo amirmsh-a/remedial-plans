@@ -231,6 +231,7 @@ function showView(v) {
   if (v === 'plans') renderPlans();
   if (v === 'users') loadUsers();
   if (v === 'folders' && window.renderFolders) window.renderFolders();
+  if (v === 'reports' && window.renderReports) window.renderReports();
   if (v !== 'folders' && location.hash.startsWith('#folders')) history.replaceState(null, '', location.pathname + location.search);
 }
 

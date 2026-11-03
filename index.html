@@ -7,9 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 48 48%22%3E%3Crect width=%2248%22 height=%2248%22 rx=%2212%22 fill=%22%230f5f4f%22/%3E%3Cpath d=%22M14 25l7 7 13-14%22 fill=%22none%22 stroke=%22white%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
-<script src="config.js?v=8"></script>
+<script src="config.js?v=9"></script>
 </head>
 <body>
 
@@ -42,6 +42,7 @@
       <button class="tab active" data-view="dashboard">لوحة الإحصاء</button>
       <button class="tab" data-view="plans">الخطط العلاجية</button>
       <button class="tab" data-view="folders">المجلدات</button>
+      <button class="tab" data-view="reports">التقارير</button>
       <button class="tab" data-view="users" hidden>المستخدمون</button>
     </nav>
     <div class="who">
@@ -113,6 +114,21 @@
       <nav class="crumbs card" id="crumbs" aria-label="المسار"></nav>
       <div id="foldersBody"></div>
       <p class="muted sm">كل مجلد مرتبط بنظيره في OneDrive برابط مشاركة يتيح لمنسوبي الجهة (بحساب الوزارة) فتح المجلد ورفع الملفات إليه مباشرة. يمكن للمستخدمين المخوَّلين أيضاً إضافة روابط الملفات والمرفقات داخل كل مجلد.</p>
+    </section>
+
+    <!-- التقارير -->
+    <section id="view-reports" class="view" hidden>
+      <div class="view-head"><h2>التقارير</h2><p class="muted sm">اختر نوع التقرير وعناصره ثم اضغط «تحميل PDF» واختر «حفظ بتنسيق PDF» من نافذة الطباعة.</p></div>
+      <div class="card r-ctrl">
+        <label>نوع التقرير<select id="rType"></select></label>
+        <label id="rSubjectW">المادة<select id="rSubject"></select></label>
+        <label id="rGradeW">الصف<select id="rGrade"></select></label>
+        <label id="rSectionW">الفصل<select id="rSection"></select></label>
+        <label id="rTeacherW">المعلم<select id="rTeacher"></select></label>
+        <button class="btn primary" id="rPdf" disabled>تحميل PDF</button>
+        <p class="hint" id="rTeacherNone" hidden>لم تُسجَّل أسماء المعلمين في الخطط بعد؛ أضف اسم المعلم من نموذج الخطة ليظهر هنا.</p>
+      </div>
+      <div id="reportOut" class="r-out"></div>
     </section>
 
     <!-- المستخدمون -->
@@ -208,7 +224,9 @@
 </dialog>
 
 <div id="toast" role="status"></div>
-<script src="app.js?v=8"></script>
-<script src="folders.js?v=8"></script>
+<div id="printHost"></div>
+<script src="app.js?v=9"></script>
+<script src="folders.js?v=9"></script>
+<script src="reports.js?v=9"></script>
 </body>
 </html>
