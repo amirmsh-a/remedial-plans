@@ -271,3 +271,32 @@ a.od:hover{background:var(--brand-soft)}
   #printHost .r-cbars,#printHost .r-two,#printHost .r-pp{grid-template-columns:repeat(2,minmax(0,1fr))}
   #printHost .r-break{break-before:page}
 }
+/* ---------- الطلاب الضعاف ---------- */
+#view-weak .kpis{margin:.75rem 0}
+.wgroup{margin-bottom:1rem;padding:0;overflow:hidden}
+.wg-head{display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;padding:.8rem 1rem;border-bottom:1px solid var(--line);background:#f7faf9}
+.wg-head h3{font-size:1rem;color:var(--brand)}
+.wg-head p{margin:.15rem 0 0}
+.wg-stats{display:flex;gap:1rem;font-size:.85rem;color:var(--muted)}
+.wg-stats b{color:var(--ink)}
+.wtbl td{vertical-align:middle}
+.wtbl td.nm{white-space:normal;min-width:170px;font-weight:700}
+.wtbl td.ed{white-space:normal;min-width:190px}
+.wtbl .ltr{direction:ltr;text-align:right}
+.wtbl textarea,.wtbl input{font:inherit;font-size:.85rem;width:100%;border:1px solid var(--line);border-radius:8px;padding:.35rem .5rem;background:#fff;resize:vertical;line-height:1.4}
+.wtbl input{width:84px;text-align:center}
+.wtbl textarea:focus,.wtbl input:focus{outline:2px solid var(--brand-2);outline-offset:0;border-color:transparent}
+.wtbl .ev{display:inline-block;margin-top:.25rem;font-size:.8rem;color:var(--brand-2)}
+.wtbl tr.saving td{background:#fffbea}
+.wtbl tr.saved td{background:#eaf6ef;transition:background .4s}
+.wtbl tr.bad td{background:var(--danger-soft)}
+.gain.up,.wg-stats .up{color:var(--ok);font-weight:800}
+.gain.down,.wg-stats .down{color:var(--danger);font-weight:800}
+.w-sub{margin:0 0 6px;font-size:11.5px;color:var(--muted)}
+.w-tbl{font-size:10.5px}.w-tbl td,.w-tbl th{padding:3px 5px}
+.w-tbl .ltr{direction:ltr;text-align:center}
+.w-tbl .w-g.up{color:var(--ok);font-weight:800}.w-tbl .w-g.down{color:#c0453c;font-weight:800}
+.w-sign{display:flex;justify-content:space-between;gap:1rem;margin-top:10px;font-size:11px;color:var(--muted)}
+.w-sheet{max-width:297mm}
+@page land{size:A4 landscape;margin:9mm}
+@media print{#printHost .w-sheet{page:land}#printHost .w-blk{break-inside:avoid}}

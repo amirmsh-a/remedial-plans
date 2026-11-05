@@ -64,7 +64,9 @@ const remoteApi = {
   deleteUser: (e, id) => rpc('user_delete', { p_emp: e, p_id: id }),
   listLinks: e => rpc('links_list', { p_emp: e }),
   addLink: (e, l) => rpc('link_add', { p_emp: e, p: l }),
-  deleteLink: (e, id) => rpc('link_delete', { p_emp: e, p_id: id })
+  deleteLink: (e, id) => rpc('link_delete', { p_emp: e, p_id: id }),
+  listWeak: e => rpc('weak_list', { p_emp: e }),
+  saveWeak: (e, p) => rpc('weak_save', { p_emp: e, p })
 };
 
 function blankPlan(subject, grade, section) {
@@ -124,6 +126,27 @@ const localApi = {
     all.push(row); store.set('rp_demo_links', all); return row;
   },
   async deleteLink(e, id) { const u = this._check(e); const l = this._links().find(x => x.id === id); if (!l) return false; if (l.added_by_emp !== u.emp_id && !userCan(u, 'delete_plans')) throw new Error('forbidden'); store.set('rp_demo_links', this._links().filter(x => x.id !== id)); return true; },
+  _weak() {
+    let w = store.get('rp_demo_weak', null); if (w) return w;
+    const first = ['خالد', 'سعد', 'فيصل', 'محمد', 'عبدالله', 'سلمان', 'تركي', 'نواف'], last = ['العتيبي', 'الحربي', 'القحطاني', 'الدوسري', 'الغامدي', 'الشهري'];
+    let seed = 11, n = 0; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280; w = [];
+    this._plans().filter(p => p.grade >= 3 && p.subject !== 'اللغة الإنجليزية').forEach(p => {
+      for (let i = 0, k = 2 + Math.floor(rnd() * 5); i < k; i++) { const s = 4 + Math.floor(rnd() * 10);
+        w.push({ id: uid(), subject: p.subject, grade: p.grade, section: p.section, teacher: p.teacher || 'معلم تجريبي', student_no: String(1180000000 + (++n) * 7919),
+          full_name: first[Math.floor(rnd() * 8)] + ' ' + first[Math.floor(rnd() * 8)] + ' ' + last[Math.floor(rnd() * 6)], max_score: 20, pre_score: s, pre_pct: s * 5,
+          skills: '', evidence: '', post_score: rnd() < 0.3 ? Math.min(20, s + Math.floor(rnd() * 8)) : null, notes: '' }); }
+    });
+    store.set('rp_demo_weak', w); return w;
+  },
+  async listWeak(e) { const u = this._check(e); return this._weak().filter(w => inScope(u, w.subject, w.grade, w.section)); },
+  async saveWeak(e, p) {
+    const u = this._check(e, 'edit_plans'); const all = this._weak(); const i = all.findIndex(x => x.id === p.id); if (i < 0) throw new Error('not found');
+    if (!inScope(u, all[i].subject, all[i].grade, all[i].section)) throw new Error('forbidden');
+    const ps = p.post_score === '' || p.post_score == null ? null : +p.post_score;
+    if (ps !== null && (ps < 0 || ps > all[i].max_score)) throw new Error('درجة الاختبار البعدي يجب أن تكون بين 0 و ' + all[i].max_score);
+    all[i] = { ...all[i], skills: p.skills || '', evidence: p.evidence || '', notes: p.notes || '', post_score: ps, updated_by: u.full_name, updated_at: new Date().toISOString() };
+    store.set('rp_demo_weak', all); return all[i];
+  },
   async deleteUser(e, id) { const me = this._check(e, 'manage_users'); if (me.emp_id === id) throw new Error('لا يمكنك حذف حسابك'); store.set(DEMO_USERS_KEY, this._users().filter(x => x.emp_id !== id)); return true; }
 };
 const api = DEMO ? localApi : remoteApi;
@@ -233,6 +256,7 @@ function showView(v) {
   if (v === 'users') loadUsers();
   if (v === 'folders' && window.renderFolders) window.renderFolders();
   if (v === 'reports' && window.renderReports) window.renderReports();
+  if (v === 'weak' && window.renderWeak) window.renderWeak();
   if (v !== 'folders' && location.hash.startsWith('#folders')) history.replaceState(null, '', location.pathname + location.search);
 }
 
@@ -616,7 +640,7 @@ function bind() {
   });
 }
 
-window.RP = { state, api, SUBJECTS, STRUCTURE, COMPONENTS, STATUSES, GRADE_LONG, GRADE_SHORT, completion, classLabel, esc, fmt, num, toast, errMsg, openPlan, loadPlans, showView, defaultOrder, isAdmin, can, subjectsOf };
+window.RP = { state, api, ROLES, SUBJECTS, STRUCTURE, COMPONENTS, STATUSES, GRADE_LONG, GRADE_SHORT, completion, classLabel, esc, fmt, num, toast, errMsg, openPlan, loadPlans, showView, defaultOrder, isAdmin, can, subjectsOf };
 
 async function init() {
   bind();
